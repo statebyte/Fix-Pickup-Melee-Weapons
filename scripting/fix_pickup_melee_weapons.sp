@@ -1,17 +1,25 @@
 #include <sdkhooks>
 #include <sdktools>
 
+//int m_hActiveWeapon = -1;
+int m_hMyWeapons = -1;
+int m_iItemDefinitionIndex = -1;
+
 public Plugin myinfo = 
 {
 	name = "Fix Pickup Melee Weapons",
 	author = "FIVE",
 	description = "Fix Pickup Melee Weapons",
-	version = "1.0",
+	version = "1.1",
 	url = "https://hlmod.ru"
 };
 
 public void OnPluginStart()
 {
+	//m_hActiveWeapon = FindSendPropInfo("CBasePlayer", "m_hActiveWeapon");
+	m_hMyWeapons = FindSendPropInfo("CBasePlayer", "m_hMyWeapons");
+	m_iItemDefinitionIndex = FindSendPropInfo("CEconEntity", "m_iItemDefinitionIndex");
+
 	for(int i = 1; i <= MaxClients; i++) if(IsClientInGame(i))
 	{
 		OnClientPutInServer(i);
@@ -26,7 +34,7 @@ public void OnClientPutInServer(int iClient)
 	}
 }
 
-public Action OnWeaponCanUse(int iClient, int iWeapon)
+Action OnWeaponCanUse(int iClient, int iWeapon)
 {
 	char sClassname[32];
 	GetEdictClassname(iWeapon, sClassname, sizeof(sClassname));
@@ -34,38 +42,40 @@ public Action OnWeaponCanUse(int iClient, int iWeapon)
 
 	if(sClassname[7] == 'k' || sClassname[7] == 'b' || (sClassname[7] == 'm' && sClassname[8] == 'e'))
 	{
-		if(!CheckWeapons(iClient, iWeapon))
+		if(!CheckWeapons(iClient, GetEntData(iWeapon, m_iItemDefinitionIndex, 2)))
 		{
 			//PrintToChatAll("Поднимаю %s....", sClassname);
 			EquipPlayerWeapon(iClient, iWeapon);
 			FakeClientCommand(iClient, "use %s", sClassname);
 		}
-		else 
+		else
 		{
-			PrintCenterText(iClient, "У вас уже есть это оружие!");
+			static int iTimeOut[MAXPLAYERS+1];
+			int iTime = GetTime();
+			if(iTimeOut[iClient] < iTime)
+			{
+				PrintHintText(iClient, "#Cstrike_Already_Own_Weapon");
+				iTimeOut[iClient] = iTime + 4;
+			}
 			return Plugin_Handled;
 		}
 	}
 	return Plugin_Continue;
 }
 
-bool CheckWeapons(int iClient, int iWeapon)
+bool CheckWeapons(int iClient, int iItemDefinitionIndex)
 {
 	int iWeaponEnt = -1;
 
-	int iMyWeapons = GetEntPropArraySize(iClient, Prop_Send, "m_hMyWeapons");
-	for(int i = 0; i < iMyWeapons; i++)
+	//int iMyWeapons = GetEntPropArraySize(iClient, Prop_Send, "m_hMyWeapons");
+	for(int i = 0; i < 64; i++)
 	{
-		iWeaponEnt = GetEntPropEnt(iClient, Prop_Send, "m_hMyWeapons", i);
+		iWeaponEnt = GetEntDataEnt2(iClient, m_hMyWeapons+i*4);
 
-		if(iWeaponEnt != -1)
+		if(iWeaponEnt != -1 && (GetEntData(iWeaponEnt, m_iItemDefinitionIndex, 2) == iItemDefinitionIndex))
 		{
-			char sClassname[32], sClassname2[32];
-			GetEdictClassname(iWeapon, sClassname, sizeof(sClassname));
-			GetEdictClassname(iWeaponEnt, sClassname2, sizeof(sClassname2));
-			if(!strcmp(sClassname, sClassname2)) return true;
+			return true;
 		}
-		
 	}
 
 	return false;
