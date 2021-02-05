@@ -21,7 +21,7 @@ public void OnPluginStart()
 	m_hMyWeapons = FindSendPropInfo("CBasePlayer", "m_hMyWeapons");
 	m_iItemDefinitionIndex = FindSendPropInfo("CEconEntity", "m_iItemDefinitionIndex");
 
-	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
+	HookEvent("round_start", Event_RoundStart, EventHookMode_Pre);
 
 	for(int i = 1; i <= MaxClients; i++) if(IsClientInGame(i))
 	{
@@ -44,34 +44,69 @@ public void OnClientPutInServer(int iClient)
 
 Action OnWeaponCanUse(int iClient, int iWeapon)
 {
-	char sClassname[32];
-	GetEdictClassname(iWeapon, sClassname, sizeof(sClassname));
-	//PrintToChatAll("Пытаюсь поднять - %s", sClassname);
-
-	if(sClassname[7] == 'k' || sClassname[7] == 'b' || (sClassname[7] == 'm' && sClassname[8] == 'e'))
+	if(iWeapon != -1)
 	{
-		int iTime = GetTime();
-		if(g_iTimeOut[iClient] < iTime)
+		char sClassname[32];
+		GetEdictClassname(iWeapon, sClassname, sizeof(sClassname));
+		//PrintToChatAll("Пытаюсь поднять - %s", sClassname);
+
+		// GetPlayerWeaponSlot(client, 2);
+
+		if(IsValidEntity(iWeapon) && (sClassname[7] == 'k' || sClassname[7] == 'b' || (sClassname[7] == 'm' && sClassname[8] == 'e')))
 		{
-			if(!CheckWeapons(iClient, GetEntData(iWeapon, m_iItemDefinitionIndex, 2)))
+			int iTime = GetTime();
+			if(g_iTimeOut[iClient] < iTime)
 			{
-				//PrintToChatAll("Поднимаю %s....", sClassname);
-				EquipPlayerWeapon(iClient, iWeapon);
-				FakeClientCommand(iClient, "use %s", sClassname);
-				g_iTimeOut[iClient] = iTime + 2;
-			}
-			else
-			{
-				PrintHintText(iClient, "#Cstrike_Already_Own_Weapon");
-				g_iTimeOut[iClient] = iTime + 4;
-				return Plugin_Handled;
+				int iItemDefinitionIndex = GetEntData(iWeapon, m_iItemDefinitionIndex, 2);
+				bool bResult = false;
+
+				if(sClassname[7] == 'm' && sClassname[8] == 'e')
+				{
+					bResult = CheckWeapons(iClient, iItemDefinitionIndex, false);
+				}
+				else bResult = CheckWeapons(iClient, iItemDefinitionIndex);
+
+				if(!bResult)
+				{
+					//PrintToChatAll("Поднимаю %s....", sClassname);
+					//RemoveEdict(iWeapon);
+					//AcceptEntityInput(iWeapon, "Kill");
+
+					//EquipPlayerWeapon(iClient, GivePlayerItem(iClient, sClassname));
+
+					EquipPlayerWeapon(iClient, iWeapon);
+					FakeClientCommand(iClient, "use %s", sClassname);
+					g_iTimeOut[iClient] = iTime + 1;
+				}
+				else
+				{
+					PrintHintText(iClient, "#Cstrike_Already_Own_Weapon");
+					g_iTimeOut[iClient] = iTime + 3;
+					return Plugin_Handled;
+				}
 			}
 		}
 	}
 	return Plugin_Continue;
 }
 
-bool CheckWeapons(int iClient, int iItemDefinitionIndex)
+bool IsHaveKnife(int iItemDefinitionIndex)
+{
+	if((iItemDefinitionIndex == 41 || iItemDefinitionIndex == 42 || iItemDefinitionIndex == 59) || (iItemDefinitionIndex >= 500 && iItemDefinitionIndex <= 600)) 
+	{
+		//PrintToChatAll("Имеет нож: %i", iItemDefinitionIndex);
+		return true;
+	}
+	else 
+	{
+		//PrintToChatAll("Не имеет нож: %i", iItemDefinitionIndex);
+		return false;
+	}
+}
+
+// true - Есть предмет в инвенторе
+// false - Не имеет предмета в инвентаре
+bool CheckWeapons(int iClient, int iItemDefinitionIndex, bool bKnife = false)
 {
 	int iWeaponEnt = -1;
 
@@ -80,9 +115,15 @@ bool CheckWeapons(int iClient, int iItemDefinitionIndex)
 	{
 		iWeaponEnt = GetEntDataEnt2(iClient, m_hMyWeapons+i*4);
 
-		if(iWeaponEnt != -1 && (GetEntData(iWeaponEnt, m_iItemDefinitionIndex, 2) == iItemDefinitionIndex))
+		if(iWeaponEnt != -1)
 		{
-			return true;
+			int iItemDefintionIndexOnInventory = GetEntData(iWeaponEnt, m_iItemDefinitionIndex, 2); 
+			
+			// Если пытается поднять предмет, который у него уже есть.
+			if(iItemDefintionIndexOnInventory == iItemDefinitionIndex) return true;
+
+			// Если пытается поднять нож другого типа.
+			if(bKnife && IsHaveKnife(iItemDefintionIndexOnInventory)) return true;
 		}
 	}
 
