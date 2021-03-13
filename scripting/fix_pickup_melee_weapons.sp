@@ -11,9 +11,11 @@ public Plugin myinfo =
 	name = "Fix Pickup Melee Weapons",
 	author = "FIVE",
 	description = "Fix Pickup Melee Weapons",
-	version = "1.2",
+	version = "1.3",
 	url = "https://hlmod.ru"
 };
+
+// m_bCanBePickedUp
 
 public void OnPluginStart()
 {
@@ -23,16 +25,19 @@ public void OnPluginStart()
 
 	HookEvent("round_start", Event_RoundStart, EventHookMode_Pre);
 
+	
 	for(int i = 1; i <= MaxClients; i++) if(IsClientInGame(i))
 	{
 		OnClientPutInServer(i);
 	}
+	
 }
 
 void Event_RoundStart(Event hEvent, const char[] sName, bool bDontBroadcast)
 {
 	for(int i; i <= MaxClients; i++) g_iTimeOut[i] = 0;
 }
+
 
 public void OnClientPutInServer(int iClient)
 {
@@ -64,7 +69,7 @@ Action OnWeaponCanUse(int iClient, int iWeapon)
 				{
 					bResult = CheckWeapons(iClient, iItemDefinitionIndex, false);
 				}
-				else bResult = CheckWeapons(iClient, iItemDefinitionIndex);
+				else bResult = CheckWeapons(iClient, iItemDefinitionIndex, true);
 
 				if(!bResult)
 				{
@@ -81,7 +86,7 @@ Action OnWeaponCanUse(int iClient, int iWeapon)
 				else
 				{
 					PrintHintText(iClient, "#Cstrike_Already_Own_Weapon");
-					g_iTimeOut[iClient] = iTime + 3;
+					g_iTimeOut[iClient] = iTime + 2;
 					return Plugin_Handled;
 				}
 			}
@@ -90,23 +95,16 @@ Action OnWeaponCanUse(int iClient, int iWeapon)
 	return Plugin_Continue;
 }
 
-bool IsHaveKnife(int iItemDefinitionIndex)
+
+bool IsWeaponKnife(int iWeaponEnt)
 {
-	if((iItemDefinitionIndex == 41 || iItemDefinitionIndex == 42 || iItemDefinitionIndex == 59) || (iItemDefinitionIndex >= 500 && iItemDefinitionIndex <= 600)) 
-	{
-		//PrintToChatAll("Имеет нож: %i", iItemDefinitionIndex);
-		return true;
-	}
-	else 
-	{
-		//PrintToChatAll("Не имеет нож: %i", iItemDefinitionIndex);
-		return false;
-	}
+	char sNetClass[8];
+	return GetEntityNetClass(iWeaponEnt, sNetClass, sizeof sNetClass) && !strncmp(sNetClass, "CKnife", 6);
 }
 
 // true - Есть предмет в инвенторе
 // false - Не имеет предмета в инвентаре
-bool CheckWeapons(int iClient, int iItemDefinitionIndex, bool bKnife = false)
+stock bool CheckWeapons(int iClient, int iItemDefinitionIndex, bool bKnife = false)
 {
 	int iWeaponEnt = -1;
 
@@ -123,9 +121,52 @@ bool CheckWeapons(int iClient, int iItemDefinitionIndex, bool bKnife = false)
 			if(iItemDefintionIndexOnInventory == iItemDefinitionIndex) return true;
 
 			// Если пытается поднять нож другого типа.
-			if(bKnife && IsHaveKnife(iItemDefintionIndexOnInventory)) return true;
+			if(bKnife && IsWeaponKnife(iWeaponEnt)) return true;
 		}
 	}
 
 	return false;
 }
+
+/*
+stock bool IsHaveKnife(int iItemDefinitionIndex)
+{
+	if((iItemDefinitionIndex == 41 || iItemDefinitionIndex == 42 || iItemDefinitionIndex == 59) || (iItemDefinitionIndex >= 500 && iItemDefinitionIndex <= 600)) 
+	{
+		//PrintToChatAll("Имеет нож: %i", iItemDefinitionIndex);
+		return true;
+	}
+	else 
+	{
+		//PrintToChatAll("Не имеет нож: %i", iItemDefinitionIndex);
+		return false;
+	}
+}
+*/
+
+/*
+public void OnEntityCreated(int entity, const char[] classname)
+{
+	if(entity != -1 && IsValidEntity(entity) && classname[7] == 'k' || classname[7] == 'b' || (classname[7] == 'm' && classname[8] == 'e'))
+	{
+		PrintToServer("OnEntityCreated >> %s", classname);
+		SetEntProp(entity, Prop_Data, "m_bCanBePickedUp", 1);
+	}
+}
+*/
+
+/*
+bool IsMeleeWeapon(char[] sClassName, int iItemDefinitionIndex = 0)
+{
+	if(sClassname[7] == 'm' && sClassname[8] == 'e') return true;
+
+	switch(iItemDefinitionIndex)
+	{
+		case 75: return true;
+		case 76: return true;
+		case 78: return true;
+	}
+
+	return false;
+}
+*/
